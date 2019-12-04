@@ -1,9 +1,9 @@
 ﻿using Microsoft.Extensions.Configuration;
-using Newtonsoft.Json.Linq;
+using Newtonsoft.Json;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
-using System.Text;
 
 namespace publiganda_teamleader
 {
@@ -13,33 +13,39 @@ namespace publiganda_teamleader
 
         static async System.Threading.Tasks.Task Main(string[] args)
         {
-
-             var builder = new ConfigurationBuilder()
-             .SetBasePath(Directory.GetCurrentDirectory())
-             .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
+            // We load in the settings here from appsettings.json
+            var builder = new ConfigurationBuilder()
+            .SetBasePath(Directory.GetCurrentDirectory())
+            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
 
             IConfigurationRoot configuration = builder.Build();
 
-            Console.WriteLine(configuration.GetSection("API_KEYS").Value.ToString());
-
-
-            JObject o = JObject.FromObject(new
-            {
-                channel = new
+            // The data we have to send to the API endpoint
+            var formContent = new FormUrlEncodedContent(new[]
                 {
-                    title = "James Newton-King",
-                    link = "http://james.newtonking.com",
-                    description = "James Newton-King's blog.",
-                 
-                }
+                new KeyValuePair<string, string>("api_group", configuration.GetSection("API_GROUP").Value.ToString()),
+                new KeyValuePair<string, string>("api_secret", configuration.GetSection("API_SECRET").Value.ToString()),
+                new KeyValuePair<string, string>("amount", "100"),
+                new KeyValuePair<string, string>("pageno", "0"),
+                new KeyValuePair<string, string>("searchby", "IKEA"),
             });
 
-            // var content = new FormUrlEncodedContent(values);
-            var content = new StringContent(o.ToString(), Encoding.UTF8, "application/json");
-            var response = await client.PostAsync("http://localhost:3000/data", content);
+            // Send to the API endpoint
+            var response = await client.PostAsync("https://app.teamleader.eu/api/getDeals.php", formContent);
 
+            // Convert the response into a string
             var responseString = await response.Content.ReadAsStringAsync();
-            Console.WriteLine("Hello World!" +  responseString);
+
+            // Parse the deals from json into C# classes
+            Deal[] allDeals = JsonConvert.DeserializeObject<Deal[]>(responseString);
+
+
+            // Loop over the deals
+            foreach (Deal deal in allDeals)
+            {
+                Console.WriteLine(deal.title + ": " +  deal.total_price_excl_vat + " EUR");
+            }
+
         }
     }
 }
